@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2026-02-20 Fri 13:14 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Building Containers from Scratch (Part 1)</title>
+<meta name="generator" content="Org mode" />
+<meta name="author" content="Zakaria Kebairia" />
+<meta name="keywords" content="containers, docker, linux, chroot, namespaces, cgroups, devops" />
+<link rel="stylesheet" href="css/main.css" type="text/css" />
+<header>
+                <h4>
+                  <a href="https://zakariakebairia.com" class="home">
+                    <img src="img/home.svg" width="50" alt="Home" />
+                  </a>
+                  <a href="files/feed.rss" class="rss">
+                    <img src="img/rss.svg" alt="RSS Feed" />
+                  </a>
+                  <a href="files/cv.pdf" class="resume">
+                    <img src="img/cv.svg" width="40" alt="My CV" />
+                  </a>
+                </h4>
+              </header>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Building Containers from Scratch (Part 1)
+<br />
+<span class="subtitle">The Foundation - chroot and Filesystem Isolation</span>
+</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgfb94d65">1. Introduction</a></li>
+<li><a href="#org309b2ab">2. Understanding chroot</a></li>
+<li><a href="#org996e6fa">3. Building Your First Container</a></li>
+<li><a href="#org1a2b423">4. Building a More Complete Container</a></li>
+<li><a href="#org07639d8">5. Next in the Series</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgfb94d65" class="outline-2">
+<h2 id="orgfb94d65"><span class="section-number-2">1</span> Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+My learning method follows a similar path most of the time. First, I start using the technology and learn my way into it. Once I feel comfortable, I try to recreate this technology myself. Not necessarily in the same way—my goal isn't to create something production-ready or at the same level of maturity as the original technology. But I focus on the building blocks that make this technology what it is.
+</p>
+
+<p>
+In this blog series, I will demonstrate how to <b>build containers from scratch</b> using nothing but Linux primitives. No Docker, no Podman, no container runtimes. Just raw system calls and command-line tools. The goal is to understand <b>what actually happens under the hood</b> when you type <code>docker run</code>.
+</p>
+
+<p>
+By the end of this series, you will have built:
+</p>
+<ul class="org-ul">
+<li>A filesystem-isolated environment using <code>chroot</code></li>
+<li>Network isolation using network namespaces (<code>ip netns</code>)</li>
+<li>Resource limits using cgroups</li>
+<li>Multi-layered filesystems using OverlayFS</li>
+<li>Bridge networking connecting multiple containers</li>
+</ul>
+
+<p>
+This is Part 1: <b>The Foundation</b>. We start with the oldest and simplest container primitive: <code>chroot</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org309b2ab" class="outline-2">
+<h2 id="org309b2ab"><span class="section-number-2">2</span> Understanding chroot</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<code>chroot</code> — short for "change root" — is the simplest form of filesystem isolation in Linux. It has been around since the early days of Unix (Version 7, 1979), making it one of the oldest isolation mechanisms available.
+</p>
+
+<p>
+The idea simply is: <code>chroot</code> changes the <b>root directory</b> (<code>/</code>) for a process and all its children. Once a process is inside a chroot, every path it resolves starts from this new root. It literally cannot reference anything above it in the directory tree.
+</p>
+</div>
+
+<div id="outline-container-org9ca83e8" class="outline-3">
+<h3 id="org9ca83e8">How It Works</h3>
+<div class="outline-text-3" id="text-org9ca83e8">
+
+<div class="figure">
+<p><img src="img/blogs/container_from_scratch/container_filesystem.png" alt="container_filesystem" width="950" align="center" title="container filesystem" />
+</p>
+</div>
+
+<p>
+The process inside the chroot <b>cannot see</b> anything outside its new root.
+This is the foundation of filesystem isolation — and the first building block of every container.<sup><a id="fnr.1" class="footref" href="#fn.1">1</a></sup>
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org996e6fa" class="outline-2">
+<h2 id="org996e6fa"><span class="section-number-2">3</span> Building Your First Container</h2>
+<div class="outline-text-2" id="text-3">
+</div>
+<div id="outline-container-org30cf31d" class="outline-3">
+<h3 id="org30cf31d">Prerequisites</h3>
+<div class="outline-text-3" id="text-org30cf31d">
+<ul class="org-ul">
+<li>A Linux system (I'm using Rocky Linux 9+)</li>
+<li>Root access via <code>sudo</code></li>
+<li>Basic familiarity with bash and the Linux filesystem</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org7ba8006" class="outline-3">
+<h3 id="org7ba8006">The First Attempt</h3>
+<div class="outline-text-3" id="text-org7ba8006">
+<p>
+Let's start simple. Create a directory called <code>my_container</code> and try to chroot into it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">mkdir my_container
+sudo chroot my_container /bin/bash
+</pre>
+</div>
+
+<pre class="example">
+chroot: failed to run command '/bin/bash': No such file or directory
+</pre>
+
+<p>
+This makes sense. When <code>chroot</code> sets <code>my_container</code> as the new root, the path <code>/bin/bash</code> resolves to <code>my_container/bin/bash</code> on the host — and that file doesn't exist yet.
+</p>
+
+<p>
+The fix is obvious — we need to create a <code>bin/</code> directory and copy the <code>bash</code> binary into it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">mkdir -p my_container/bin
+cp /bin/bash my_container/bin/
+</pre>
+</div>
+
+<p>
+Try again:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">sudo chroot my_container /bin/bash
+</pre>
+</div>
+
+<pre class="example">
+bash: error while loading shared libraries: libtinfo.so.6: cannot open shared object file: No such file or directory
+</pre>
+
+<p>
+<b>Progress!</b> The binary was found, but now it fails to load. The reason: every dynamically linked binary depends on shared libraries (<code>.so</code> files) at runtime. Without them, the dynamic linker has nothing to work with.
+</p>
+
+<p>
+We can use <code>ldd</code> to discover exactly which libraries <code>bash</code> needs:<sup><a id="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">ldd /bin/bash
+</pre>
+</div>
+
+<pre class="example">
+linux-vdso.so.1 (0x......)
+libtinfo.so.6 =&gt; /lib64/libtinfo.so.6 (0x....)
+libc.so.6 =&gt; /lib64/libc.so.6 (0x....)
+/lib64/ld-linux-x86-64.so.2 (0x....)
+</pre>
+
+<p>
+The output shows that <code>bash</code> needs libraries from <code>/lib64/</code>. Let's extract just the paths:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">ldd /bin/bash | grep -o <span style="font-style: italic;">'/lib[^ ]*'</span>
+</pre>
+</div>
+
+<pre class="example">
+/lib64/libtinfo.so.6
+/lib64/libc.so.6
+/lib64/ld-linux-x86-64.so.2
+</pre>
+
+
+<p>
+Let's create the library directory inside our container and copy these files:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">mkdir my_container/lib64
+
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Copy each library
+</span>cp /lib64/libtinfo.so.6 my_container/lib64/
+cp /lib64/libc.so.6 my_container/lib64/
+cp /lib64/ld-linux-x86-64.so.2 my_container/lib64/
+</pre>
+</div>
+
+<p>
+Now try <code>chroot</code> again:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">sudo chroot my_container /bin/bash
+</pre>
+</div>
+
+<p>
+<b>We're in.</b> This is our first container — primitive, but functional.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash">bash-5.1# pwd
+/
+bash-5.1# cd /bin
+bash-5.1# pwd
+/bin
+bash-5.1# exit
+</pre>
+</div>
+
+<p>
+From inside the chroot, <code>/</code> points to <code>my_container/</code> on the host. We only have <code>bash</code> and its built-in commands (<code>cd</code>, <code>pwd</code>) at this point — no <code>ls</code>, no <code>cat</code>, nothing else. That's expected: if a binary isn't copied into the container, it simply doesn't exist.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1a2b423" class="outline-2">
+<h2 id="org1a2b423"><span class="section-number-2">4</span> Building a More Complete Container</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+The first container proved the concept. Now let's build something we can actually work with.
+</p>
+
+<p>
+But before moving foreward, pause and think about what we're really doing here:
+the <code>bash</code> process in the previous example is "<b>contained</b>" in the new directory, and to do that we're constructing a <b>minimal Linux filesystem</b> from scratch.
+</p>
+
+<p>
+We want the process inside to feel like it's running in a full Linux installation — its own binaries, its own libraries, and eventually its own network stack.
+</p>
+
+<p>
+That's what a container fundamentally is: a carefully constructed filesystem combined with isolation mechanisms that control what the process can see, how many resources it can consume, and what privileges it can gain.
+</p>
+
+<p>
+For the rest of this series, we'll need a few more tools inside the container:
+<code>ls</code>, <code>ps</code>, <code>echo</code> for basic interaction, and <code>nc</code>, <code>ip</code> for the networking parts.
+</p>
+</div>
+
+<div id="outline-container-orgb6435b2" class="outline-3">
+<h3 id="orgb6435b2">Directory Structure</h3>
+<div class="outline-text-3" id="text-orgb6435b2">
+<div class="org-src-container">
+<pre class="src src-bash"><span style="font-weight: bold; font-style: italic;">CONTAINER_ID</span>=<span style="font-style: italic;">'my_container'</span>
+mkdir -p ${<span style="font-weight: bold; font-style: italic;">CONTAINER_ID</span>}/{bin,sbin,lib,lib64}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgcb77633" class="outline-3">
+<h3 id="orgcb77633">Copy the Binaries</h3>
+<div class="outline-text-3" id="text-orgcb77633">
+<div class="org-src-container">
+<pre class="src src-bash"><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Install netcat if not present
+</span>sudo dnf install -y nmap-ncat
+
+cp -v /bin/{bash,ls,ps,echo,nc} ${<span style="font-weight: bold; font-style: italic;">CONTAINER_ID</span>}/bin/
+cp -v /sbin/ip                   ${<span style="font-weight: bold; font-style: italic;">CONTAINER_ID</span>}/sbin/
+</pre>
+</div>
+
+<pre class="example">
+'/bin/bash' -&gt; 'my_container/bin/bash'
+'/bin/ls'   -&gt; 'my_container/bin/ls'
+'/bin/ps'   -&gt; 'my_container/bin/ps'
+'/bin/echo' -&gt; 'my_container/bin/echo'
+'/bin/nc'   -&gt; 'my_container/bin/nc'
+'/sbin/ip'  -&gt; 'my_container/sbin/ip'
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgc0fc66c" class="outline-3">
+<h3 id="orgc0fc66c">Copy the Libraries</h3>
+<div class="outline-text-3" id="text-orgc0fc66c">
+<p>
+Each binary has its own set of dependencies.
+Let's resolve and copy all of them in one pass:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><span style="font-weight: bold; font-style: italic;">binaries</span>=(/bin/bash /bin/ls /bin/ps /bin/echo /bin/nc /sbin/ip)
+
+ldd <span style="font-style: italic;">"${binaries[@]}"</span> <span style="font-style: italic;">\</span>
+    | grep -o <span style="font-style: italic;">'/lib[^ ]*'</span> <span style="font-style: italic;">\</span>
+    | <span style="font-weight: bold;">while </span><span style="font-weight: bold;">read</span> lib; <span style="font-weight: bold;">do</span>
+        [ -f <span style="font-style: italic;">"$lib"</span> ] || <span style="font-weight: bold;">continue</span>
+        mkdir -p <span style="font-style: italic;">"${CONTAINER_ID}/$(</span><span style="font-weight: bold;">dirname</span><span style="font-style: italic;"> $lib)"</span>
+        cp -n <span style="font-style: italic;">"$lib"</span> <span style="font-style: italic;">"${CONTAINER_ID}/${lib}"</span>
+    <span style="font-weight: bold;">done</span>
+
+</pre>
+</div>
+
+<pre class="example">
+/lib/x86_64-linux-gnu/libtinfo.so.6
+/lib/x86_64-linux-gnu/libc.so.6
+/lib64/ld-linux-x86-64.so.2
+/lib/x86_64-linux-gnu/libprocps.so.8
+/lib/x86_64-linux-gnu/libsystemd.so.0
+/lib/x86_64-linux-gnu/libnsl.so.1
+/lib/x86_64-linux-gnu/libnss_files.so.2
+/lib/x86_64-linux-gnu/libm.so.6
+...
+</pre>
+
+<p>
+The <code>-n</code> flag tells <code>cp</code> to skip files that already exist — so shared libraries like <code>libc</code> are only copied once, even though multiple binaries depend on them.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge8df5aa" class="outline-3">
+<h3 id="orge8df5aa">Enter the Container</h3>
+<div class="outline-text-3" id="text-orge8df5aa">
+<div class="org-src-container">
+<pre class="src src-bash">sudo chroot . /bin/bash
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-bash">bash-5.1# ls /
+bin  lib  lib64  sbin
+
+bash-5.1# ls /bin
+bash  echo  ls  nc  ps
+
+bash-5.1# ls -lh /bin
+total 7.7M
+-rwxr-xr-x. 1 root root 1.4M Feb 15 10:23 bash
+-rwxr-xr-x. 1 root root  37K Feb 15 10:23 echo
+-rwxr-xr-x. 1 root root 145K Feb 15 10:23 ls
+-rwxr-xr-x. 1 root root  43K Feb 15 10:23 nc
+-rwxr-xr-x. 1 root root 143K Feb 15 10:23 ps
+
+bash-5.1# exit
+</pre>
+</div>
+
+<p>
+Everything works. The container has an isolated filesystem, functional binaries, and the tools we'll need going forward.
+</p>
+
+
+<p>
+Cool, <code>chroot</code>. It's one layer — filesystem isolation. The process inside can still see host processes, share the host network, and consume unlimited resources. In the next parts, we'll add the missing layers: network namespaces, and resource limits &#x2026;etc. Each one brings us closer to what <code>docker run</code> actually does.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org07639d8" class="outline-2">
+<h2 id="org07639d8"><span class="section-number-2">5</span> Next in the Series</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+We'll create network namespaces, wire them together with virtual ethernet pairs,
+and test connectivity between containers using the <code>nc</code> and <code>ip</code> tools we just staged.
+</p>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1">1</a></sup> <div class="footpara"><p class="footpara">
+<code>chroot</code> changes the filesystem view but is <b>not</b> a security boundary.
+A privileged process can escape it. 
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.2" class="footnum" href="#fnr.2">2</a></sup> <div class="footpara"><p class="footpara">
+<code>ldd</code> prints shared library dependencies by inspecting the binary's ELF dynamic section.
+On most Linux distributions, it uses the dynamic linker to resolve paths without fully executing the binary.
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+
+<p class="postamble">
+  <a href="http://creativecommons.org/licenses/by-sa/4.0/" class="crc">
+    <img src="img/crc.png" alt="Creative Commons License" />
+  </a>
+
+  <a href="https://www.linkedin.com/in/zakaria-kebairia/" class="social">
+    <img src="img/social/linkedin-icon-logo.svg" width="45" alt="LinkedIn" />
+  </a>
+
+  <a href="https://twitter.com/z_kebairia" class="social">
+    <img src="img/social/twitter-logo.svg" width="40" alt="Twitter" />
+  </a>
+
+  <a href= "https://www.youtube.com/@zakariakebairia" class="social">
+    <img src="img/social/youtube-black-logo.svg" width="40" alt="YouTube" />
+  </a>
+
+  <a href="https://www.github.com/zakariakebairia" class="social">
+    <img src="img/social/github.svg" width="43" alt="GitHub" />
+  </a>
+
+  <br>
+
+  <p class="credit">
+    Copyright &copy; 2026 Zakaria Kebairia
+    <br>
+    Content licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC-BY-SA 4.0</a> unless otherwise noted.
+  </p>
+</p>
+</div>
+</body>
+</html>
