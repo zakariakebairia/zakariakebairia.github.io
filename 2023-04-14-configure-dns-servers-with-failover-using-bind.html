@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-02-22 Sun 23:00 -->
+<!-- 2026-02-22 Sun 23:05 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Configure Dns Servers With Failover Using Bind</title>
@@ -34,8 +34,8 @@ Date: 14 April 2023
 </p>
 
 </div>
-<div id="outline-container-org60a29a4" class="outline-2">
-<h2 id="org60a29a4"><span class="section-number-2">1</span> Introduction</h2>
+<div id="outline-container-org704c658" class="outline-2">
+<h2 id="org704c658"><span class="section-number-2">1</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 We are going to setup and confgure a DNS server with a failover and dynamic updates on RockyLinux using BIND.<br />
@@ -51,8 +51,8 @@ The Bind packages is called <code>named</code> in the RedHat-like distribution l
 </div>
 </div>
 
-<div id="outline-container-org227a174" class="outline-2">
-<h2 id="org227a174"><span class="section-number-2">2</span> Prerequisites</h2>
+<div id="outline-container-org3e59c5b" class="outline-2">
+<h2 id="org3e59c5b"><span class="section-number-2">2</span> Prerequisites</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 Two VMs with RockyLinux with the following configurations
@@ -102,8 +102,8 @@ Two VMs with RockyLinux with the following configurations
 </div>
 </div>
 
-<div id="outline-container-orgc55fd9f" class="outline-2">
-<h2 id="orgc55fd9f"><span class="section-number-2">3</span> The Plan</h2>
+<div id="outline-container-org393011a" class="outline-2">
+<h2 id="org393011a"><span class="section-number-2">3</span> The Plan</h2>
 <div class="outline-text-2" id="text-3">
 <ol class="org-ol">
 <li>Install the required packages on both servers</li>
@@ -115,14 +115,14 @@ Two VMs with RockyLinux with the following configurations
 </div>
 </div>
 
-<div id="outline-container-orgf20ba92" class="outline-2">
-<h2 id="orgf20ba92"><span class="section-number-2">4</span> Primary configuration on the nodes</h2>
+<div id="outline-container-org446c515" class="outline-2">
+<h2 id="org446c515"><span class="section-number-2">4</span> Primary configuration on the nodes</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 On both server, install the following packages
 </p>
 <div class="org-src-container">
-<pre class="src src-sh" id="org3baaf0a">sudo dnf install bind bind-utils -y
+<pre class="src src-sh" id="org8e9890a">sudo dnf install bind bind-utils -y
 </pre>
 </div>
 
@@ -164,8 +164,8 @@ drwx------. 2 named named 6 Apr 14 14:40 /var/log/named
 </div>
 </div>
 
-<div id="outline-container-org43f49fd" class="outline-2">
-<h2 id="org43f49fd"><span class="section-number-2">5</span> RNDC Setup</h2>
+<div id="outline-container-orge533035" class="outline-2">
+<h2 id="orge533035"><span class="section-number-2">5</span> RNDC Setup</h2>
 <div class="outline-text-2" id="text-5">
 <div class="note">
 <p>
@@ -211,8 +211,8 @@ chmod 0640 /etc/rndc.key
 </div>
 </div>
 </div>
-<div id="outline-container-orga9d1d72" class="outline-2">
-<h2 id="orga9d1d72"><span class="section-number-2">6</span> Master DNS configuration</h2>
+<div id="outline-container-orgb417d49" class="outline-2">
+<h2 id="orgb417d49"><span class="section-number-2">6</span> Master DNS configuration</h2>
 <div class="outline-text-2" id="text-6">
 <p>
 We will seperate our configuration into multiple files and use <code>include</code> statement to embed these files into <code>/etc/named.conf</code> file.
@@ -230,9 +230,9 @@ This will help us seperate the the parts of the configuraton that are static fro
 └── zones.conf
 </pre>
 </div>
-<div id="outline-container-orgdffcfff" class="outline-3">
-<h3 id="orgdffcfff">The main configuration file</h3>
-<div class="outline-text-3" id="text-orgdffcfff">
+<div id="outline-container-org69eeb36" class="outline-3">
+<h3 id="org69eeb36">The main configuration file</h3>
+<div class="outline-text-3" id="text-org69eeb36">
 <p>
 the main configuration file for <code>named</code> is <code>/etc/named.conf</code>, open this file and add the following content
 </p>
@@ -318,9 +318,9 @@ the main configuration file for <code>named</code> is <code>/etc/named.conf</cod
 </div>
 </div>
 
-<div id="outline-container-org8b14942" class="outline-3">
-<h3 id="org8b14942">The zones configuration file</h3>
-<div class="outline-text-3" id="text-org8b14942">
+<div id="outline-container-org31e81de" class="outline-3">
+<h3 id="org31e81de">The zones configuration file</h3>
+<div class="outline-text-3" id="text-org31e81de">
 <p>
 Here we define our zones; each zone must have its corresponding reverse zone
 </p>
@@ -449,9 +449,9 @@ $TTL    604800
 </div>
 </div>
 
-<div id="outline-container-orgbf275a1" class="outline-3">
-<h3 id="orgbf275a1">The logging configuration file</h3>
-<div class="outline-text-3" id="text-orgbf275a1">
+<div id="outline-container-org7196204" class="outline-3">
+<h3 id="org7196204">The logging configuration file</h3>
+<div class="outline-text-3" id="text-org7196204">
 <p>
 And the logging configuration file
 </p>
@@ -489,13 +489,13 @@ And the logging configuration file
 </div>
 </div>
 </div>
-<div id="outline-container-orga81eb2b" class="outline-2">
-<h2 id="orga81eb2b"><span class="section-number-2">7</span> Backup DNS configuration</h2>
+<div id="outline-container-org58860eb" class="outline-2">
+<h2 id="org58860eb"><span class="section-number-2">7</span> Backup DNS configuration</h2>
 <div class="outline-text-2" id="text-7">
 </div>
-<div id="outline-container-orgd425ea1" class="outline-3">
-<h3 id="orgd425ea1">The main configuration file</h3>
-<div class="outline-text-3" id="text-orgd425ea1">
+<div id="outline-container-org1275078" class="outline-3">
+<h3 id="org1275078">The main configuration file</h3>
+<div class="outline-text-3" id="text-org1275078">
 <p>
 Now with the backup DNS configuration
 </p>
@@ -571,9 +571,9 @@ Now with the backup DNS configuration
 </div>
 </div>
 
-<div id="outline-container-orgcb63652" class="outline-3">
-<h3 id="orgcb63652">The zones configuration file</h3>
-<div class="outline-text-3" id="text-orgcb63652">
+<div id="outline-container-orge44c6c6" class="outline-3">
+<h3 id="orge44c6c6">The zones configuration file</h3>
+<div class="outline-text-3" id="text-orge44c6c6">
 <div class="org-src-container">
 <pre class="src src-conf"><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">vim: syntax=named
 </span><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Use the root hints file for "." zone
@@ -601,9 +601,9 @@ Now with the backup DNS configuration
 </div>
 </div>
 
-<div id="outline-container-orgfbde523" class="outline-3">
-<h3 id="orgfbde523">The logging configuration file</h3>
-<div class="outline-text-3" id="text-orgfbde523">
+<div id="outline-container-org1177ba7" class="outline-3">
+<h3 id="org1177ba7">The logging configuration file</h3>
+<div class="outline-text-3" id="text-org1177ba7">
 <p>
 And then the logging configuration file.
 </p>
@@ -643,8 +643,8 @@ And then the logging configuration file.
 </div>
 </div>
 
-<div id="outline-container-orgd6807cf" class="outline-2">
-<h2 id="orgd6807cf"><span class="section-number-2">8</span> Configure a client server</h2>
+<div id="outline-container-org1b1899f" class="outline-2">
+<h2 id="org1b1899f"><span class="section-number-2">8</span> Configure a client server</h2>
 <div class="outline-text-2" id="text-8">
 <div class="note">
 <ul class="org-ul">
