@@ -27,505 +27,6 @@ my_container
 
 
 
-* COMMENT Introduction
-
-In [[https://zakariakebairia.com/2026-02-15-building-containers-from-scratch-(part-1).html][Part 1]], we built a filesystem-isolated container using =chroot=.
-
-However, our container still shares the *host's network stack*.
-In practice, that means two containers can't both listen on port 80 for example without conflicting,
-your container can see host network interfaces it has no business with,
-and there's nothing stopping it from binding to a port the host is already using.
-Real isolation means the container should have no idea the host's network even exists.
-
-That's what *network namespaces* give us.
-
-* COMMENT What We're Building
-
-Before diving in, here's the plan so you know where we're headed.
-
-1) We're going to create an isolated network namespace — think of it as a completely separate network stack living alongside the host's.
-2) Then we'll wire the two together using a *virtual ethernet pair* (veth), which acts like a network cable connecting two isolated worlds.
-3) Finally, we'll combine the network namespace with =chroot= to get a process that has both filesystem isolation /and/ network isolation at the same time.
-
-* COMMENT Understanding Network Namespaces
-
-As we said above, a *network namespace* creates a completely isolated network stack. Each namespace gets
-its own network interfaces, IP addresses, routing tables ...etc.
-
-What that means in practice: a process inside such a namespace can only see and interact
-with the interfaces that live in /its/ namespace. It has no view of the host's =eth0=,
-no access to the host's routing decisions.
-completely independent. Two processes in different namespaces can both bind to port 80
-without any conflict.
-
-Each namespace also starts with its own =lo= (loopback) interface, and can have
-virtual interfaces connected to other namespaces — which is exactly how we'll
-wire the container to the host.
-
-** How the pieces fit together
-
-A *veth pair* is the glue. Think of it as a virtual network cable: two ends,
-and whatever you send into one end comes out the other. We'll place one end
-in the host namespace and one end in the container namespace — that's our
-communication channel between the two isolated worlds.
-# #+ATTR_HTML: :width 1000 :align center :alt Network namespace diagram :class diagram
-# [[file:img/blogs/container_from_scratch/part2/netns_transparent.gif]]
-
-#+ATTR_HTML: :width 1000 :align center :alt Network namespace diagram :class diagram
-[[file:img/blogs/container_from_scratch/part2/netns.gif]]
-
-
-# #+begin_src text
-#   ┌─────────────────────────────────────────────────────────────────┐
-#   │                         HOST NAMESPACE                          │
-#   │                                                                 │
-#   │  ┌──────────────┐              ┌──────────────────────────┐     │
-#   │  │              │              │                          │     │
-#   │  │   eth0       │              │      veth-host           │     │
-#   │  │  (Internet)  │              │   192.168.10.1/24        │     │
-#   │  │              │              │                          │     │
-#   │  └──────────────┘              └────────────┬─────────────┘     │
-#   │                                             │                   │
-#   │                                             │ Virtual           │
-#   │                                             │ Ethernet          │
-#   │                                             │ Pair (veth)       │
-#   └─────────────────────────────────────────────┼───────────────────┘
-#                                                 │
-#   ┌─────────────────────────────────────────────┼──────────────────┐
-#   │                    CONTAINER NAMESPACE      │                  │
-#   │                                             │                  │
-#   │                          ┌──────────────────▼─────────────┐   │
-#   │  ┌──────────────┐        │                                 │   │
-#   │  │              │        │      veth-container             │   │
-#   │  │   lo         │        │     192.168.10.2/24             │   │
-#   │  │ (loopback)   │        │                                 │   │
-#   │  │              │        │                                 │   │
-#   │  └──────────────┘        └─────────────────────────────────┘   │
-#   │                                                                │
-#   └────────────────────────────────────────────────────────────────┘
-
-#   Traffic flow: Host (192.168.10.1) ←→ Container (192.168.10.2)
-# #+end_src
-
-* COMMENT Building a Networked Container
-
-** Prerequisites
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-Ensure you have the =my_container= directory from [[https://zakariakebairia.com/2026-02-15-building-containers-from-scratch-(part-1).html][Part 1]].
-
-** Step 1: Create a Network Namespace
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns add container_net
-#+end_src
-
-Verify the namespace was created:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-ip netns list
-#+end_src
-
-#+begin_example
-container_net
-#+end_example
-
-** Step 2: Create a Virtual Ethernet Pair
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-Now we create the virtual cable — both ends land in the host namespace for now.
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip link add veth-host type veth peer name veth-container
-#+end_src
-
-Verify both interfaces exist:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-ip link show | grep veth
-#+end_src
-
-#+begin_example
-6: veth-container@veth-host: <BROADCAST,MULTICAST,M-DOWN> mtu 1500
-7: veth-host@veth-container: <BROADCAST,MULTICAST,M-DOWN> mtu 1500
-#+end_example
-
-Both are currently in the *host namespace* and down.
-
-** Step 3: Move One End into the Container Namespace
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-This is where the cable gets plugged in. We move =veth-container= into the namespace,
-so one end lives on the host side and the other inside the future container.
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip link set veth-container netns container_net
-#+end_src
-
-Verify =veth-container= is gone from the host:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-ip link show | grep veth
-#+end_src
-
-#+begin_example
-7: veth-host@if6: <BROADCAST,MULTICAST> mtu 1500
-#+end_example
-
-And verify it exists inside the namespace:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ip link show
-#+end_src
-
-#+begin_example
-1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN
-6: veth-container@if7: <BROADCAST,MULTICAST> mtu 1500
-#+end_example
-
-#+begin_callout_note
-The namespace now has two interfaces: =lo= (loopback) and =veth-container=.
-Both are currently down.
-#+end_callout_note
-
-#+begin_callout_note
-we can execute command inside the network namespace using
-=ip netns exec <network namespace> <your command here>=
-we will need that later when using it along with =chroot=
-#+end_callout_note
-
-** Step 4: Configure the Host Side
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-Assign an IP address and bring up the interface:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip addr add 192.168.10.1/24 dev veth-host
-sudo ip link set veth-host up
-#+end_src
-
-Verify:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-ip addr show veth-host
-#+end_src
-
-#+begin_example
-7: veth-host@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
-    inet 192.168.10.1/24 scope global veth-host
-#+end_example
-
-** Step 5: Configure the Container Side
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-First, bring up the loopback interface:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ip link set lo up
-#+end_src
-
-Then configure the container interface:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ip addr add 192.168.10.2/24 dev veth-container
-sudo ip netns exec container_net ip link set veth-container up
-#+end_src
-
-Verify:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ip addr show
-#+end_src
-
-#+begin_example
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536
-    inet 127.0.0.1/8 scope host lo
-6: veth-container@if7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
-    inet 192.168.10.2/24 scope global veth-container
-#+end_example
-
-** Step 6: Test Network Connectivity
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-From the host, ping the container:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-ping -c 3 192.168.10.2
-#+end_src
-
-#+begin_example
-PING 192.168.10.2 (192.168.10.2) 56(84) bytes of data.
-64 bytes from 192.168.10.2: icmp_seq=1 ttl=64 time=0.053 ms
-64 bytes from 192.168.10.2: icmp_seq=2 ttl=64 time=0.042 ms
-64 bytes from 192.168.10.2: icmp_seq=3 ttl=64 time=0.039 ms
-#+end_example
-
-From the container namespace, ping the host:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ping -c 3 192.168.10.1
-#+end_src
-
-#+begin_example
-PING 192.168.10.1 (192.168.10.1) 56(84) bytes of data.
-64 bytes from 192.168.10.1: icmp_seq=1 ttl=64 time=0.041 ms
-64 bytes from 192.168.10.1: icmp_seq=2 ttl=64 time=0.038 ms
-64 bytes from 192.168.10.1: icmp_seq=3 ttl=64 time=0.037 ms
-#+end_example
-
-Network connectivity is established![fn:ping-success]
-
-* COMMENT Running a Service Inside the Container
-
-So far, the network namespace and the chroot environment have been two separate things.
-Now we bring them together.
-
-The command below runs a shell that is simultaneously locked into =my_container='s
-filesystem /and/ placed inside the =container_net= network namespace.
-That's the moment where filesystem isolation and network isolation work together —
-and what you get starts looking a lot like an actual container.
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net chroot my_container /bin/bash
-#+end_src
-
-You are now inside a process that can't see the host filesystem and can't see
-the host network.
-
-Start a simple HTTP server on port 8080:
-
-#+begin_src bash
-echo -e "HTTP/1.1 200 OK\r\n\r\nHello from the Container!" | nc -l -p 8080
-#+end_src
-
-The server is listening on port *8080* — but only inside the container's network namespace.
-
-** Test from the Host
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-In another terminal, test the connection:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-curl http://192.168.10.2:8080
-#+end_src
-
-#+begin_example
-Hello from the Container!
-#+end_example
-
-And voilà
-
-** Verify Isolation
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-From the host, check listening ports:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-ss -tlnp | grep 8080
-#+end_src
-
-#+begin_example
-(no output)
-#+end_example
-
-Port 8080 is *not* visible on the host network stack — it only exists inside the
-container namespace.[fn:port-isolation]
-
-** Connecting to the Outside World :optional:
-:PROPERTIES:
-:UNNUMBERED: yes
-:END:
-
-The container can talk to the host, but it's completely blind to the internet.
-To fix that, we need two things: a default route so the container knows where
-to send traffic, and masquerading [fn:masquerade] on the host so packets can actually leave
-with a routable source address.
-
-First, inside the container namespace, add a default route pointing to the host:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ip route add default via 192.168.10.1 dev veth-container
-#+end_src
-
-Verify the routing table:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ip route show
-#+end_src
-
-#+begin_example
-default via 192.168.10.1 dev veth-container
-192.168.10.0/24 dev veth-container proto kernel scope link src 192.168.10.2
-#+end_example
-
-Now enable masquerading[fn:masquerade] on the host so outgoing packets get a valid source IP (the IP of the Host):
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo firewall-cmd --add-masquerade
-#+end_src
-
-#+begin_example
-success
-#+end_example
-
-Let's ping =8.8.8.8= from inside the container:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ping -c 3 8.8.8.8
-#+end_src
-
-#+begin_example
-PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
-64 bytes from 8.8.8.8: icmp_seq=1 ttl=113 time=14.2 ms
-64 bytes from 8.8.8.8: icmp_seq=2 ttl=113 time=13.8 ms
-64 bytes from 8.8.8.8: icmp_seq=3 ttl=113 time=14.1 ms
-
---- 8.8.8.8 ping statistics ---
-3 packets transmitted, 3 received, 0% packet loss, time 2003ms
-rtt min/avg/max/mdev = 13.8/14.0/14.2/0.183 ms
-#+end_example
-
-We're online. Now try a domain name:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ping -c 1 google.com
-#+end_src
-
-#+begin_example
-ping: google.com: Temporary failure in name resolution
-#+end_example
-
-Makes sense — the namespace has no DNS configured.
-The container's =/etc/resolv.conf= is empty, so it has no idea where to ask.
-Fix it by pointing it at a nameserver:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
-#+end_src
-
-Now try again:
-
-#+ATTR_HTML: :class cmd-root
-#+begin_src bash
-sudo ip netns exec container_net ping -c 3 google.com
-#+end_src
-
-#+begin_example
-PING google.com (142.250.185.46) 56(84) bytes of data.
-64 bytes from lga34s32-in-f14.1e100.net (142.250.185.46): icmp_seq=1 ttl=113 time=15.1 ms
-64 bytes from lga34s32-in-f14.1e100.net (142.250.185.46): icmp_seq=2 ttl=113 time=14.7 ms
-64 bytes from lga34s32-in-f14.1e100.net (142.250.185.46): icmp_seq=3 ttl=113 time=14.9 ms
-
---- google.com ping statistics ---
-3 packets transmitted, 3 received, 0% packet loss, time 2003ms
-rtt min/avg/max/mdev = 14.7/14.9/15.1/0.163 ms
-#+end_example
-
-Fully connected.[fn:resolv-ns]
-
-* COMMENT What We Achieved
-
-We started this part with a container that could isolate the filesystem but had
-no network isolation at all. Now it has its own network interfaces, its own IP
-address, its own routing table, and isolated ports — and it can reach the internet.
-
-But the container can still consume as much resources as it wants and
-bring the host to its knees. That's what Part 3 is about.
-
-# [[something][Part 3: Resource Limits with cgroups →]]
-
-* COMMENT Footnotes
-
-[fn:veth-pair]
-A veth (virtual ethernet) pair is like a pipe — packets sent into one end come out the other.
-This is the fundamental building block for container networking.
-
-[fn:ping-success]
-If ping fails, check:
-1. Both interfaces are UP
-2. IP addresses are correctly assigned
-3. Firewall is not blocking ICMP
-
-[fn:port-isolation]
-This is critical for multi-tenant environments.
-Containers can all listen on port 80 without conflicts because each has its own network namespace.
-
-[fn:resolv-ns]
-If you're using =chroot= alongside the network namespace, the container's =/etc/resolv.conf=
-lives at =my_container/etc/resolv.conf= on the host filesystem — you may want to write there directly instead.
-
-
-
-#+TITLE: Building Containers from Scratch (Part 2)
-#+SUBTITLE: Network Isolation with Namespaces
-#+AUTHOR: Zakaria Kebairia
-#+EMAIL: 4.kebairia@gmail.com
-#+DATE: 19 February 2026
-#+OPTIONS: html5-fancy:t tex:t toc:1 num:t
-#+STARTUP: show2levels indent hidestars
-#+KEYWORDS: containers, docker, linux, namespaces, networking, veth, devops
-#+export: org-special-block-extras
-
-#+MACRO: container_name my_container
-#+MACRO: container_ip 192.168.10.2
-#+MACRO: host_ip 192.168.10.1
-#+MACRO: netns_name container_net
-
-* COMMENT README :noexport:
-#+name: startup
-#+begin_src elisp :results none
-  (load-theme 'modus-operandi-deuteranopia)
-#+end_src
-
-#+name: container
-#+begin_src text :exports none
-my_container
-#+end_src
-
-
-
 * Introduction
 
 In [[https://zakariakebairia.com/2026-02-15-building-containers-from-scratch-(part-1).html][Part 1]], we built a filesystem-isolated container using =chroot=.
@@ -564,6 +65,9 @@ interfaces connected to other namespaces — which is exactly how we'll wire the
 to the host.
 
 ** How the pieces fit together
+:PROPERTIES:
+:UNNUMBERED: yes
+:END:
 
 A *veth pair* is the glue. Think of it as a virtual network cable: two ends, and whatever
 you send into one end comes out the other. We put one end in the host namespace and one
@@ -899,7 +403,8 @@ We're online. Now try a domain name:
 
 #+ATTR_HTML: :class cmd-root
 #+begin_src bash
-sudo ip netns exec container_net ping -c 1 google.com
+  sudo ip netns exec container_net chroot my_container /bin/bash
+  ping -c 3 google.com
 #+end_src
 
 #+begin_example
@@ -911,14 +416,20 @@ empty, so it has nowhere to ask. Fix it:
 
 #+ATTR_HTML: :class cmd-root
 #+begin_src bash
-sudo ip netns exec container_net bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+  mkdir -p  my_container/etc
+  sudo ip netns exec container_net bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 #+end_src
 
 Now try again:
 
 #+ATTR_HTML: :class cmd-root
 #+begin_src bash
-sudo ip netns exec container_net ping -c 3 google.com
+  sudo ip netns exec container_net chroot my_container /bin/bash
+#+end_src
+
+And then
+#+begin_src bash
+  ping -c 3 google.com
 #+end_src
 
 #+begin_example
@@ -940,8 +451,8 @@ We started with a container that isolated the filesystem but left the network co
 exposed. Now it has its own interfaces, its own IP address, its own routing table, and
 isolated ports — and it can reach the internet.
 
-But the container can still consume as much CPU and memory as it wants, and bring the host
-to its knees. That's what Part 3 is about.
+But the container can still consume as much CPU and memory as it wants, and can bring the host
+to its knees. That's what Part 3 will be about.
 
 # [[something][Part 3: Resource Limits with cgroups →]]
 
