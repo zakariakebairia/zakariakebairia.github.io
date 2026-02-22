@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-02-22 Sun 23:21 -->
+<!-- 2026-02-22 Sun 23:24 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Building Containers from Scratch (Part 1)</title>
@@ -22,16 +22,16 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#org9d879ce">1. Introduction</a></li>
-<li><a href="#org8184c19">2. Understanding chroot</a></li>
-<li><a href="#orgaa6361d">3. Building Your First Container</a></li>
-<li><a href="#org5f5f708">4. Building a More Complete Container</a></li>
-<li><a href="#orge075373">5. Next in the Series</a></li>
+<li><a href="#org098b8f5">1. Introduction</a></li>
+<li><a href="#org3803a99">2. Understanding chroot</a></li>
+<li><a href="#org86d1c78">3. Building Your First Container</a></li>
+<li><a href="#org325c931">4. Building a More Complete Container</a></li>
+<li><a href="#orgecdafda">5. Next in the Series</a></li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org9d879ce" class="outline-2">
-<h2 id="org9d879ce"><span class="section-number-2">1</span> Introduction</h2>
+<div id="outline-container-org098b8f5" class="outline-2">
+<h2 id="org098b8f5"><span class="section-number-2">1</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 My learning method follows a similar path most of the time. First, I start using the technology and learn my way into it. Once I feel comfortable, I try to recreate this technology myself. Not necessarily in the same way—my goal isn't to create something production-ready or at the same level of maturity as the original technology. But I focus on the building blocks that make this technology what it is.
@@ -58,8 +58,8 @@ This is Part 1: <b>The Foundation</b>. We start with the oldest and simplest con
 </div>
 </div>
 
-<div id="outline-container-org8184c19" class="outline-2">
-<h2 id="org8184c19"><span class="section-number-2">2</span> Understanding chroot</h2>
+<div id="outline-container-org3803a99" class="outline-2">
+<h2 id="org3803a99"><span class="section-number-2">2</span> Understanding chroot</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 <code>chroot</code> — short for "change root" — is the simplest form of filesystem isolation in Linux. It has been around since the early days of Unix (Version 7, 1979), making it one of the oldest isolation mechanisms available.
@@ -70,9 +70,9 @@ The idea simply is: <code>chroot</code> changes the <b>root directory</b> (<code
 </p>
 </div>
 
-<div id="outline-container-org5599c60" class="outline-3">
-<h3 id="org5599c60">How It Works</h3>
-<div class="outline-text-3" id="text-org5599c60">
+<div id="outline-container-org44a31b0" class="outline-3">
+<h3 id="org44a31b0">How It Works</h3>
+<div class="outline-text-3" id="text-org44a31b0">
 
 <div class="figure">
 <p><img src="img/blogs/container_from_scratch/container_filesystem.png" alt="container_filesystem" width="950" align="center" title="container filesystem" />
@@ -87,13 +87,13 @@ This is the foundation of filesystem isolation — and the first building block 
 </div>
 </div>
 
-<div id="outline-container-orgaa6361d" class="outline-2">
-<h2 id="orgaa6361d"><span class="section-number-2">3</span> Building Your First Container</h2>
+<div id="outline-container-org86d1c78" class="outline-2">
+<h2 id="org86d1c78"><span class="section-number-2">3</span> Building Your First Container</h2>
 <div class="outline-text-2" id="text-3">
 </div>
-<div id="outline-container-orgbcb2fb0" class="outline-3">
-<h3 id="orgbcb2fb0">Prerequisites</h3>
-<div class="outline-text-3" id="text-orgbcb2fb0">
+<div id="outline-container-orge7677bf" class="outline-3">
+<h3 id="orge7677bf">Prerequisites</h3>
+<div class="outline-text-3" id="text-orge7677bf">
 <ul class="org-ul">
 <li>A Linux system (I'm using Rocky Linux 9+)</li>
 <li>Root access via <code>sudo</code></li>
@@ -102,9 +102,9 @@ This is the foundation of filesystem isolation — and the first building block 
 </div>
 </div>
 
-<div id="outline-container-org8213211" class="outline-3">
-<h3 id="org8213211">The First Attempt</h3>
-<div class="outline-text-3" id="text-org8213211">
+<div id="outline-container-org09db815" class="outline-3">
+<h3 id="org09db815">The First Attempt</h3>
+<div class="outline-text-3" id="text-org09db815">
 <p>
 Let's start simple. Create a directory called <code>my_container</code> and try to chroot into it:
 </p>
@@ -226,8 +226,8 @@ From inside the chroot, <code>/</code> points to <code>my_container/</code> on t
 </div>
 </div>
 
-<div id="outline-container-org5f5f708" class="outline-2">
-<h2 id="org5f5f708"><span class="section-number-2">4</span> Building a More Complete Container</h2>
+<div id="outline-container-org325c931" class="outline-2">
+<h2 id="org325c931"><span class="section-number-2">4</span> Building a More Complete Container</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 The first container proved the concept. Now let's build something we can actually work with.
@@ -252,9 +252,9 @@ For the rest of this series, we'll need a few more tools inside the container:
 </p>
 </div>
 
-<div id="outline-container-orgea1abf0" class="outline-3">
-<h3 id="orgea1abf0">Directory Structure</h3>
-<div class="outline-text-3" id="text-orgea1abf0">
+<div id="outline-container-org11c98a0" class="outline-3">
+<h3 id="org11c98a0">Directory Structure</h3>
+<div class="outline-text-3" id="text-org11c98a0">
 <div class="org-src-container">
 <pre class="src src-bash"><span style="font-weight: bold; font-style: italic;">CONTAINER_ID</span>=<span style="font-style: italic;">'my_container'</span>
 mkdir -p ${<span style="font-weight: bold; font-style: italic;">CONTAINER_ID</span>}/{bin,sbin,lib,lib64}
@@ -263,9 +263,9 @@ mkdir -p ${<span style="font-weight: bold; font-style: italic;">CONTAINER_ID</sp
 </div>
 </div>
 
-<div id="outline-container-org982ff94" class="outline-3">
-<h3 id="org982ff94">Copy the Binaries</h3>
-<div class="outline-text-3" id="text-org982ff94">
+<div id="outline-container-org467f613" class="outline-3">
+<h3 id="org467f613">Copy the Binaries</h3>
+<div class="outline-text-3" id="text-org467f613">
 <div class="org-src-container">
 <pre class="src src-bash"><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Install netcat if not present
 </span>sudo dnf install -y nmap-ncat
@@ -286,9 +286,9 @@ cp -v /sbin/ip                   ${<span style="font-weight: bold; font-style: i
 </div>
 </div>
 
-<div id="outline-container-org5442136" class="outline-3">
-<h3 id="org5442136">Copy the Libraries</h3>
-<div class="outline-text-3" id="text-org5442136">
+<div id="outline-container-org7631ef8" class="outline-3">
+<h3 id="org7631ef8">Copy the Libraries</h3>
+<div class="outline-text-3" id="text-org7631ef8">
 <p>
 Each binary has its own set of dependencies.
 Let's resolve and copy all of them in one pass:
@@ -326,9 +326,9 @@ The <code>-n</code> flag tells <code>cp</code> to skip files that already exist 
 </div>
 </div>
 
-<div id="outline-container-org9c70888" class="outline-3">
-<h3 id="org9c70888">Enter the Container</h3>
-<div class="outline-text-3" id="text-org9c70888">
+<div id="outline-container-orgb4f1d97" class="outline-3">
+<h3 id="orgb4f1d97">Enter the Container</h3>
+<div class="outline-text-3" id="text-orgb4f1d97">
 <div class="org-src-container">
 <pre class="src src-bash">sudo chroot . /bin/bash
 </pre>
@@ -369,8 +369,8 @@ In the next parts, we'll add the missing layers: network namespaces, and resourc
 </div>
 </div>
 
-<div id="outline-container-orge075373" class="outline-2">
-<h2 id="orge075373"><span class="section-number-2">5</span> Next in the Series</h2>
+<div id="outline-container-orgecdafda" class="outline-2">
+<h2 id="orgecdafda"><span class="section-number-2">5</span> Next in the Series</h2>
 <div class="outline-text-2" id="text-5">
 <p>
 We'll create network namespaces, wire them together with virtual ethernet pairs,
