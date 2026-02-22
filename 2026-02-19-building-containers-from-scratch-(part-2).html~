@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-02-22 Sun 22:54 -->
+<!-- 2026-02-22 Sun 22:55 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Building Containers from Scratch (Part 2)</title>
@@ -22,18 +22,18 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#orgc311970">1. Introduction</a></li>
-<li><a href="#orga829345">2. What We're Building</a></li>
-<li><a href="#org025ce59">3. Understanding Network Namespaces</a></li>
-<li><a href="#orgb4e6602">4. Building a Networked Container</a></li>
-<li><a href="#org7af364d">5. Running a Service Inside the Container</a></li>
-<li><a href="#orgbf881a3">6. What We Achieved</a></li>
+<li><a href="#orgb6fc48e">1. Introduction</a></li>
+<li><a href="#org343fbdd">2. What We're Building</a></li>
+<li><a href="#org846a17c">3. Understanding Network Namespaces</a></li>
+<li><a href="#org5a9d07b">4. Building a Networked Container</a></li>
+<li><a href="#orgfebdcab">5. Running a Service Inside the Container</a></li>
+<li><a href="#org04a32e2">6. What We Achieved</a></li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-orgc311970" class="outline-2">
-<h2 id="orgc311970"><span class="section-number-2">1</span> Introduction</h2>
+<div id="outline-container-orgb6fc48e" class="outline-2">
+<h2 id="orgb6fc48e"><span class="section-number-2">1</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 In <a href="https://zakariakebairia.com/2026-02-15-building-containers-from-scratch-(part-1).html">Part 1</a>, we built a filesystem-isolated container using <code>chroot</code>.
@@ -53,8 +53,8 @@ That's what <b>network namespaces</b> give us.
 </div>
 </div>
 
-<div id="outline-container-orga829345" class="outline-2">
-<h2 id="orga829345"><span class="section-number-2">2</span> What We're Building</h2>
+<div id="outline-container-org343fbdd" class="outline-2">
+<h2 id="org343fbdd"><span class="section-number-2">2</span> What We're Building</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 Before diving in, here's the plan.
@@ -71,8 +71,8 @@ isolation <i>and</i> network isolation at the same time.</li>
 </div>
 </div>
 
-<div id="outline-container-org025ce59" class="outline-2">
-<h2 id="org025ce59"><span class="section-number-2">3</span> Understanding Network Namespaces</h2>
+<div id="outline-container-org846a17c" class="outline-2">
+<h2 id="org846a17c"><span class="section-number-2">3</span> Understanding Network Namespaces</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 A <b>network namespace</b> creates a completely isolated network stack. Each namespace gets
@@ -93,8 +93,8 @@ to the host.
 </p>
 </div>
 
-<div id="outline-container-org5437c58" class="outline-3">
-<h3 id="org5437c58"><span class="section-number-3">3.1</span> How the pieces fit together</h3>
+<div id="outline-container-org2e44a78" class="outline-3">
+<h3 id="org2e44a78"><span class="section-number-3">3.1</span> How the pieces fit together</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
 A <b>veth pair</b> is the glue. Think of it as a virtual network cable: two ends, and whatever
@@ -112,22 +112,22 @@ worlds.
 </div>
 </div>
 
-<div id="outline-container-orgb4e6602" class="outline-2">
-<h2 id="orgb4e6602"><span class="section-number-2">4</span> Building a Networked Container</h2>
+<div id="outline-container-org5a9d07b" class="outline-2">
+<h2 id="org5a9d07b"><span class="section-number-2">4</span> Building a Networked Container</h2>
 <div class="outline-text-2" id="text-4">
 </div>
-<div id="outline-container-org8e208d8" class="outline-3">
-<h3 id="org8e208d8">Prerequisites</h3>
-<div class="outline-text-3" id="text-org8e208d8">
+<div id="outline-container-orge3c58f5" class="outline-3">
+<h3 id="orge3c58f5">Prerequisites</h3>
+<div class="outline-text-3" id="text-orge3c58f5">
 <p>
 Make sure you have the <code>my_container</code> directory from <a href="https://zakariakebairia.com/2026-02-15-building-containers-from-scratch-(part-1).html">Part 1</a>.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org0aaae8c" class="outline-3">
-<h3 id="org0aaae8c">Step 1: Create a Network Namespace</h3>
-<div class="outline-text-3" id="text-org0aaae8c">
+<div id="outline-container-org1a77f46" class="outline-3">
+<h3 id="org1a77f46">Step 1: Create a Network Namespace</h3>
+<div class="outline-text-3" id="text-org1a77f46">
 <div class="org-src-container">
 <pre class="src src-bash">sudo ip netns add container_net
 </pre>
@@ -148,9 +148,9 @@ container_net
 </div>
 </div>
 
-<div id="outline-container-orgaa74ba8" class="outline-3">
-<h3 id="orgaa74ba8">Step 2: Create a Virtual Ethernet Pair</h3>
-<div class="outline-text-3" id="text-orgaa74ba8">
+<div id="outline-container-org3578d16" class="outline-3">
+<h3 id="org3578d16">Step 2: Create a Virtual Ethernet Pair</h3>
+<div class="outline-text-3" id="text-org3578d16">
 <p>
 Now we create the virtual cable. Both ends land in the host namespace for now.
 </p>
@@ -180,9 +180,9 @@ Both are in the <b>host namespace</b> and currently down.
 </div>
 </div>
 
-<div id="outline-container-org61cc481" class="outline-3">
-<h3 id="org61cc481">Step 3: Move One End into the Container Namespace</h3>
-<div class="outline-text-3" id="text-org61cc481">
+<div id="outline-container-org6378a8e" class="outline-3">
+<h3 id="org6378a8e">Step 3: Move One End into the Container Namespace</h3>
+<div class="outline-text-3" id="text-org6378a8e">
 <div class="org-src-container">
 <pre class="src src-bash">sudo ip link set veth-container netns container_net
 </pre>
@@ -233,9 +233,9 @@ We'll use this heavily when combining the namespace with <code>chroot</code>.
 </div>
 </div>
 
-<div id="outline-container-org9550c00" class="outline-3">
-<h3 id="org9550c00">Step 4: Configure the Host Side</h3>
-<div class="outline-text-3" id="text-org9550c00">
+<div id="outline-container-org9f64917" class="outline-3">
+<h3 id="org9f64917">Step 4: Configure the Host Side</h3>
+<div class="outline-text-3" id="text-org9f64917">
 <p>
 Assign an IP address and bring the interface up:
 </p>
@@ -262,9 +262,9 @@ Verify:
 </div>
 </div>
 
-<div id="outline-container-org80433c2" class="outline-3">
-<h3 id="org80433c2">Step 5: Configure the Container Side</h3>
-<div class="outline-text-3" id="text-org80433c2">
+<div id="outline-container-orgab2fbf5" class="outline-3">
+<h3 id="orgab2fbf5">Step 5: Configure the Container Side</h3>
+<div class="outline-text-3" id="text-orgab2fbf5">
 <p>
 First, bring up the loopback interface:
 </p>
@@ -302,9 +302,9 @@ Verify:
 </div>
 </div>
 
-<div id="outline-container-org00d4375" class="outline-3">
-<h3 id="org00d4375">Step 6: Test Network Connectivity</h3>
-<div class="outline-text-3" id="text-org00d4375">
+<div id="outline-container-org88ed171" class="outline-3">
+<h3 id="org88ed171">Step 6: Test Network Connectivity</h3>
+<div class="outline-text-3" id="text-org88ed171">
 <p>
 From the host, ping the container:
 </p>
@@ -344,8 +344,8 @@ The two namespaces can talk to each other.<sup><a id="fnr.1" class="footref" hre
 </div>
 </div>
 
-<div id="outline-container-org7af364d" class="outline-2">
-<h2 id="org7af364d"><span class="section-number-2">5</span> Running a Service Inside the Container</h2>
+<div id="outline-container-orgfebdcab" class="outline-2">
+<h2 id="orgfebdcab"><span class="section-number-2">5</span> Running a Service Inside the Container</h2>
 <div class="outline-text-2" id="text-5">
 <p>
 So far, the network namespace and the chroot environment have been two separate things.
@@ -382,9 +382,9 @@ The server is listening on port <b>8080</b> — but only inside the container's 
 </p>
 </div>
 
-<div id="outline-container-org35ecd5e" class="outline-3">
-<h3 id="org35ecd5e">Verify Isolation</h3>
-<div class="outline-text-3" id="text-org35ecd5e">
+<div id="outline-container-org1becef2" class="outline-3">
+<h3 id="org1becef2">Verify Isolation</h3>
+<div class="outline-text-3" id="text-org1becef2">
 <p>
 From the host, check listening ports:
 </p>
@@ -405,9 +405,9 @@ container namespace.<sup><a id="fnr.2" class="footref" href="#fn.2">2</a></sup>
 </div>
 </div>
 
-<div id="outline-container-org1e31a4a" class="outline-3">
-<h3 id="org1e31a4a">Test from the Host</h3>
-<div class="outline-text-3" id="text-org1e31a4a">
+<div id="outline-container-org64e501e" class="outline-3">
+<h3 id="org64e501e">Test from the Host</h3>
+<div class="outline-text-3" id="text-org64e501e">
 <p>
 In another terminal:
 </p>
@@ -427,9 +427,9 @@ And voilà.
 </div>
 </div>
 
-<div id="outline-container-org85f4f57" class="outline-3">
-<h3 id="org85f4f57">Connecting to the Outside World&#xa0;&#xa0;&#xa0;<span class="tag"><span class="optional">optional</span></span></h3>
-<div class="outline-text-3" id="text-org85f4f57">
+<div id="outline-container-orga2a2936" class="outline-3">
+<h3 id="orga2a2936">Connecting to the Outside World&#xa0;&#xa0;&#xa0;<span class="tag"><span class="optional">optional</span></span></h3>
+<div class="outline-text-3" id="text-orga2a2936">
 <p>
 The container can talk to the host, but it's blind to the internet. To fix that, we need
 two things: a default route so the container knows where to send traffic, and masquerading <sup><a id="fnr.3" class="footref" href="#fn.3">3</a></sup>
@@ -551,8 +551,8 @@ Fully connected.<sup><a id="fnr.4" class="footref" href="#fn.4">4</a></sup>
 </div>
 </div>
 
-<div id="outline-container-orgbf881a3" class="outline-2">
-<h2 id="orgbf881a3"><span class="section-number-2">6</span> What We Achieved</h2>
+<div id="outline-container-org04a32e2" class="outline-2">
+<h2 id="org04a32e2"><span class="section-number-2">6</span> What We Achieved</h2>
 <div class="outline-text-2" id="text-6">
 <p>
 We started with a container that isolated the filesystem but left the network completely
