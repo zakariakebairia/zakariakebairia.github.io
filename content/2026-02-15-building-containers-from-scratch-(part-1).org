@@ -212,7 +212,7 @@ Each binary has its own set of dependencies.
 Let's resolve and copy all of them in one pass:
 
 #+begin_src bash
-binaries=(/bin/bash /bin/ls /bin/ps /bin/echo /bin/nc /sbin/ip)
+binaries=(/bin/bash /bin/ls /bin/ps /bin/echo /bin/nc /sbin/ip /bin/ping)
 
 ldd "${binaries[@]}" \
     | grep -o '/lib[^ ]*' \
